@@ -1,7 +1,7 @@
 "# DCSWCapstone"
 Instructions for compilation and running:
 Clone the repo to your computer with /git clone https://github.com/firework4lj/DCSWCapstone
-For the Arduino code:
+For the Arduino code (testarduino):
 1.) Open in Arduino IDE
 2.) Click verify, and then upload and run on an Arduino device. The console will display the input. HARDWARE REQUIRED.
 For the monitoring code (DCSWMonitoringApp):
