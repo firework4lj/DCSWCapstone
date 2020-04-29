@@ -1,4 +1,4 @@
-"# DCSWCapstone" 
+"# DCSWCapstone"
 Instructions for compilation and running:
 Clone the repo to your computer with /git clone https://github.com/firework4lj/DCSWCapstone
 For the Arduino code:
