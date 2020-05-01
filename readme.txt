@@ -7,4 +7,4 @@ For the Arduino code (testarduino):
 For the monitoring code (DCSWMonitoringApp):
 1.) Open the .sln file located in the DCSWMonitorApp folder in Visual Studio
 2.) Click "Start"
-3.) The monitoring app should open. If no hardware is connected, it will throw errors, simply click okay on or close these. It should then display NULL for all the data points.
+3.) The monitoring app should open. If no hardware is connected, it will throw errors, simply click okay or close these. It should then display NULL for all the data points.
