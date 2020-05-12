@@ -24,16 +24,33 @@ namespace DCSWMonitorApp
         public string _arduinoSerialCom;
         public string _pvtresults;
         public string _pvtaverage;
+        public string _ttnt;
         public SerialPort sp = new SerialPort("COM4", 9600, Parity.None, 8, StopBits.One);
         private readonly Joystick joystick;
         private readonly JoystickTypes joystickType;
         public bool testStarted = false;
         public bool testInProgress = false;
+        public bool avgNotInit = true;
         public DateTime startTime;
         public DateTime endTime;
         public long elapsedTicks;
         public double totalResponse;
         public int tests = 0;
+        public DateTime pvtLastRan = DateTime.Now;
+
+        // TUNING VARIABLES:
+        public static int historySize = 16; // 16 measurements are stored of the steering wheel degrees for logic to be ran on.
+        public static int sensorHistorySize = 16; // 16 measurements are stored of the pressure sensor in order to determine when the user grips it harder. 
+        public static int sensorAvgHistorySize = 2; // 2 sensor average stores to compare new averages to in order to determine when a blip is detected. (it will only compare 2 averages at the current state.)
+        public static int secondsBetweenTests = 10; // 600 seconds, or 10 minutes between tests. Set to 30 seconds for testing
+        public static int leftTurnMaxDegree = -400; // How far from center should the driver be able to turn left before the test is executed - MAX is -5000
+        public static int rightTurnMaxDegree = 400; // How far from center should the driver be able to turn right before the test is executed - MAX is 5000
+        public static double lowerBoundSensorAlg = 1.005; // Sensor average divided by previous average must result in a value greater than 1.2 indicating a blip has occured.
+        // END TUNING VARIABLES
+
+        public int[] wheelHistory = new int[historySize];
+        public int[] sensorHistory = new int[sensorHistorySize];
+        public double[] sensorAvgHistory = new double[sensorAvgHistorySize];
 
         public Home()
             {
@@ -44,6 +61,11 @@ namespace DCSWMonitorApp
                 _timer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(100) };
                 _timer.Tick += _timer_Tick;
                 _timer.Start();
+            // Initialize history array to all 0's
+            for(int i = 0; i< historySize; i++)
+            {
+                wheelHistory[i] = 0;
+            }
             try
             {
                 //Check if a serial input device is connected, if so open serial input either way set initial values to null
@@ -132,6 +154,26 @@ namespace DCSWMonitorApp
                 var state = joystick.GetCurrentState();
                 int xVal = state.X;
                 LeftAxis = string.Format("Wheel Position: {0} Degrees", xVal);
+                // Insert new reading into degree history, push list back.
+                int [] temp = new int[historySize];
+                for (int i = 0; i < historySize-1; i++)
+                {
+                    if (i == 0)
+                    {
+                        temp[i] = xVal;
+                    }
+                    else
+                    {
+                        temp[i] = wheelHistory[i-1];
+                    }
+                }
+                wheelHistory = temp;
+                // Print history to console for debugging
+              // for(int i = 0; i < historySize; i++)
+              // {
+              //     Console.Write(wheelHistory[i]+",");
+              // }
+              // Console.Write("\n");
             }
             else
             {
@@ -143,54 +185,144 @@ namespace DCSWMonitorApp
         {
             //Write the serial port data to the console.
            string message = sp.ReadLine();
-           Console.WriteLine(message);
+           // No need for this debug message anymore.
+           // Console.WriteLine(message);
            //message it the 9 character string sent from the arduino. The first 4 chars are for the left sensor, the next 4 are for the right sensor, and the last is for the button
            ArduinoSerialMsg = string.Format("Left Sensor = {0}{1}{2}{3} | Right Sensor = {4}{5}{6}{7} | Button Status = {8}", message[0], message[1], message[2], message[3], message[4], message[5], message[6], message[7], message[8]);
-           int leftSensor = int.Parse((string) string.Format("{0}{1}{2}{3}", message[0], message[1], message[2], message[3]));
+           int leftSensor = int.Parse(string.Format("{0}{1}{2}{3}", message[0], message[1], message[2], message[3]));
            int rightSensor = int.Parse(string.Format("{0}{1}{2}{3}", message[4], message[5], message[6], message[7]));
-           if (/*axisdata shows the user is in a safe position to start*/true)
-                //this if has not yet been implimented. It will check that the user is not turning before starting a test. For now it is always true
-           {
-               if (/*pvt test needed*/testStarted == true && testInProgress == false)
-                    //checks if test needs to be started and that one is not already happening so we don't start a test with one already going
-               {
-                   // Start PVT test
-                   //get current time to compare time at response to later
-                   startTime = DateTime.Now;
-                   //set test started to false, once we start running a test we won't need to run one anymore
-                   testStarted = false;
-                   testInProgress = true;
-               }
-               //what to execute for PVT test
-               else if(testStarted == false && testInProgress == true)
-               {
-                   if ((message[8] == '0') || (leftSensor > 650 || rightSensor > 650)) {
-                       //If the button is pressed or the left or right pressure sensor on the steering wheel is squeezed
-                       //These are all methods of the user responding to the test so the time and test should stop
-                       endTime = DateTime.Now;
-                       testInProgress = false;
-                       //Calculate the reaction time
-                       elapsedTicks = endTime.Ticks - startTime.Ticks;
-                       TimeSpan elapsedSpan = new TimeSpan(elapsedTicks);
-                       stopTest();
-                       //increase variable that keeps track of the number of tests that have been run so far, used for averaging results
-                       tests++;
-                       //Add response time for current test to response times from previous tests, used for averaging results
-                       totalResponse = totalResponse + elapsedSpan.TotalMilliseconds;
-                       // Print pvt results to program
-                       PVTAverage = string.Format("Average response time of: {0}ms over {1} tests.", Math.Truncate(totalResponse / tests), tests);
-                       //A PVT response over 500ms is considered a faliure
-                       if (elapsedSpan.TotalMilliseconds > 500)
-                       {
-                           PVTResults = string.Format("PVT Results = {0}ms | Test Failure", Math.Truncate(elapsedSpan.TotalMilliseconds));
-                       }
-                       else
-                       {
-                           PVTResults = string.Format("PVT Results = {0}ms | Test Pass", Math.Truncate(elapsedSpan.TotalMilliseconds));
-                       }
+            int[] temp = new int[sensorHistorySize];
+            for (int i = 0; i < sensorHistorySize; i++)
+            {
+                if (i == 0)
+                {
+                    temp[i] = (leftSensor+rightSensor)/2; // Average the value between the two sensors.
+                }
+                else
+                {
+                    temp[i] = sensorHistory[i - 1];
+                }
+            }
+            sensorHistory = temp;
+
+            double averageVal = 0;
+            for (int i = 0; i < sensorHistorySize; i++)
+            {
+                averageVal = sensorHistory[i] + averageVal;
+            }
+            averageVal = averageVal / sensorHistorySize;
+            double[] temp2 = new double[sensorAvgHistorySize];
+            for (int i = 0; i < sensorAvgHistorySize; i++)
+            {
+                if (i == 0)
+                {
+                    temp2[i] = averageVal; // Average value of all the data in the stored sensor measurments.
+                }
+                else
+                {
+                    temp2[i] = sensorAvgHistory[i - 1];
+                }
+                if (avgNotInit)
+                {
+                    temp2[1] = averageVal; // Set the last average val equal to the current avg val to prevent divide by 0
+                    avgNotInit = false;
+                }
+            }
+            sensorAvgHistory = temp2;
+            for(int i = 0; i < sensorAvgHistorySize; i++)
+            {
+                Console.Write(sensorAvgHistory[i]+",");
+            }
+            Console.Write("\n");
+
+            // First if statement should check if pvt is required at this point. 
+            if (testInProgress == true || checkPvtRequired()) // Check if the test is required by time. Bypass if the test has already been started.
+            {
+                if (testInProgress == true || checkPvtSafe()) // Check wheel history to determine if it is safe to perform a pvt test. Bypass if the test has already been started
+                {
+                    if (testInProgress == false)
+                    {
+                        sp.Write("<s>\n");
+                        sp.Write("V1\n");
+                        sp.Write("L1\n");
+                        startTime = DateTime.Now;
+                        testInProgress = true;
+                    }
+                    else if (testInProgress == true)
+                    {
+                        if ((message[8] == '0') || sensorBlipDetector()) // If button is pressed, or pressure sensors exceed 650, stop test. Pressure sensors ***NEED TO BE DYNAMICALLY SET***
+                        {
+                            endTime = DateTime.Now;
+                            testInProgress = false;
+                            elapsedTicks = endTime.Ticks - startTime.Ticks;
+                            TimeSpan elapsedSpan = new TimeSpan(elapsedTicks);
+                            stopTest();
+                            tests++;
+                            totalResponse = totalResponse + elapsedSpan.TotalMilliseconds;
+                            PVTAverage = string.Format("Average response time of: {0}ms over {1} tests.", Math.Truncate(totalResponse / tests), tests);
+                            pvtLastRan = endTime; // Set the last run time to the end time of the current test.
+                            if (elapsedSpan.TotalMilliseconds > 500)
+                            {
+                                PVTResults = string.Format("PVT Results = {0}ms | Test Failure", Math.Truncate(elapsedSpan.TotalMilliseconds));
+                            }
+                            else
+                            {
+                                PVTResults = string.Format("PVT Results = {0}ms | Test Pass", Math.Truncate(elapsedSpan.TotalMilliseconds));
+                            }
+                        }
                     }
                 }
             }
+        }
+
+        bool checkPvtRequired()
+        {
+            long elapsedTicksFromLastPvt = DateTime.Now.Ticks - pvtLastRan.Ticks;
+            TimeSpan elapsedTimeSpanFromLastPvt = new TimeSpan(elapsedTicksFromLastPvt);
+            TimeToNextTest = string.Format("Time to Next Test: {0} Seconds", Math.Truncate(secondsBetweenTests - elapsedTimeSpanFromLastPvt.TotalSeconds));
+            if(elapsedTimeSpanFromLastPvt.TotalSeconds >= secondsBetweenTests)
+            {
+                // Test is required now.
+                // It has been 10 minutes since last pvt test. 
+                Console.WriteLine("Test is now required based on time elapsed.");
+                return true;
+            }
+            else
+            {
+                return false;
+            }
+        }
+
+        bool checkPvtSafe()
+        {
+            // This is where the algorithm determines if the driver has been driving straight for an extended period of time and we can safely execute the test.
+            for(int i = 0; i < historySize; i++)
+            {
+                if((wheelHistory[i] > leftTurnMaxDegree) && (wheelHistory[i] < rightTurnMaxDegree))
+                {
+                    continue;
+                }
+                else
+                {
+                    // Wheel has not been straight enough for a PVT test to be performed. 
+                    Console.WriteLine("Test cannot be perfomed safely at this time.");
+                    return false;
+                }
+            }
+            // Wheel has been within parameters for a PVT test to be performed.
+            return true;
+        }
+
+        bool sensorBlipDetector()
+        {
+            // Compare the values, and figure out if there is a sizeable blip. Aka sensor values are higher for an extended period of time. This might be difficult.
+            double diff = sensorAvgHistory[0] / sensorAvgHistory[1];
+            Console.WriteLine(diff);
+            if (diff >= lowerBoundSensorAlg){
+                Console.WriteLine("BLIP DETECTED");
+                return true;
+            }
+            return false;
         }
 
         void MainWindow_Closing(object sender, CancelEventArgs e)
@@ -269,6 +401,20 @@ namespace DCSWMonitorApp
             }
         }
 
+        public string TimeToNextTest
+        {
+            get
+            {
+                return _ttnt;
+            }
+            set
+            {
+                if (value == _ttnt) return;
+                _ttnt = value;
+                OnPropertyChanged();
+            }
+        }
+
         // **************************
         // End message section
         // **************************
@@ -280,23 +426,14 @@ namespace DCSWMonitorApp
 
         // Start pvt test by sending the vibration motor a signal to turn on. 
         // Also set the testStarted variable to true to signal the test has begun.
-        private void startPVT_Click_V(object sender, RoutedEventArgs e)
+        private void startPVT_Click(object sender, RoutedEventArgs e)
         {
             sp.Write("<s>\n");
-            
             sp.Write("V1\n");
-            testStarted = true;
-        }
-
-        // Start pvt test by sending the led a signal to turn on
-        // Also set the testStarted variable to true to signal the test has begun.
-        private void startPVT_Click_L(object sender, RoutedEventArgs e)
-        {
-            sp.Write("<s>\n");
             sp.Write("L1\n");
+            pvtLastRan = pvtLastRan.AddDays(-5); // Cause a pvt test to be performed now
             testStarted = true;
         }
-
 
         // Reset the light and vibration motor to off.
         public void stopTest()

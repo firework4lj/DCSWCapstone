@@ -21,9 +21,11 @@
       </TextBlock>
             <TextBlock FontSize="16">
         <Run Text="{Binding PVTAverage}"/>
-      </TextBlock>
-      <Button x:Name = "StartPvtL" Content = "Start PVT LED" HorizontalAlignment="Center" Width = "100" Click="startPVT_Click_L"/>
-      <Button x:Name = "StartPvtV" Content = "Start PVT Vibration" HorizontalAlignment="Center" Width = "100" Click="startPVT_Click_V"/>
+            </TextBlock>
+            <TextBlock FontSize="16">
+                <Run Text="{Binding TimeToNextTest}"/>
+            </TextBlock>
+            <Button x:Name = "StartPvtL" Content = "Manually Start PVT" HorizontalAlignment="Center" Width = "100" Click="startPVT_Click"/>
       <Button x:Name = "LedOn" Content = "Led On" HorizontalAlignment="Center" Width = "100" Click="ledOn_Click"/>
       <Button x:Name = "LedOff" Content = "Led Off" HorizontalAlignment="Center" Width = "100" Click="ledOff_Click"/>
       <Button x:Name = "VibOn" Content = "Vibration On" HorizontalAlignment="Center" Width = "100" Click="vibOn_Click"/>
