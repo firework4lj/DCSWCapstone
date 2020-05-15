@@ -1,7 +1,8 @@
 const byte numChars = 64;
-char receivedChars[numChars];
-
+char receivedChars[numChars]
 boolean newData = false;
+
+//set pin values for I/O
 const int buttonPin = 2;
 byte ledPin = 13;   // the onboard LED
 byte vibrationpin = 12;
@@ -14,6 +15,7 @@ const int rightpressurepin =  A1;
 void setup() {
     Serial.begin(9600);
 
+    //set up I/O pin modes
     pinMode(buttonPin, INPUT);
     pinMode(ledPin, OUTPUT);
     pinMode(vibrationpin,OUTPUT);
@@ -38,6 +40,7 @@ void loop() {
 
 //===============
 
+//function waits to recieve start marker then reads in string
 void wait_to_start() {
     static boolean recvInProgress = false;
     static byte ndx = 0;
@@ -74,6 +77,8 @@ void wait_to_start() {
 }
 //===============
 
+//constantly send packets to desktop application
+//and checking for any requests it sends
 void start_running(){
 
   boolean going=true;
@@ -87,12 +92,15 @@ void start_running(){
 
 
 void send_packet(){
- //Button 1/0
- //signed double for accellerometer
- //0-1024 for each pressure sensor
- //
- //          PS0  PS1 B
+ //Packet stored as ArduinoSerialMsg in Home.xaml.cs
+ //How input data sent from arduino 
+ //Button uses 1/0 for high/low
+ //signed double for accellerometer, accellerometer not implimented
+ //values are between 0-1024 for each pressure sensor
+ //How packet mapped:
+ //         PS0  PS1  B
  // PACKET: XXXX XXXX X 
+
   char button;
   if(digitalRead(11)){
     button='0';
@@ -102,8 +110,11 @@ void send_packet(){
   }
   int leftsensorint = analogRead(A0);
   int rightsensorint = analogRead(A1);
- // int rightsensorint= 500;
   int buttonRead;
+
+  //get the ones, tens, hundreds, and thousands place
+  // for the value from each sensor
+  //This is how the values are sent as 4 chars, one for each place
   char leftsensorchar[4];
   char rightsensorchar[4];
   int tho = 0;
@@ -123,14 +134,12 @@ void send_packet(){
   int rhun = 0;
   int rten = 0;
   int rone = 0;
-//  rtho = (rightsensorint%10000)/1000;
   if(rightsensorint<1000){
     rtho =0;
   }
   else{
     rtho = 1;
   }
-//rhun = (rightsensorint-(rtho*1000))/100;
   rhun = (rightsensorint%1000)/100;
   rten = (rightsensorint-(rtho*1000)-(rhun*100))/10;
   rone = (rightsensorint-(rtho*1000)-(rhun*100)-(rten*10));
@@ -139,30 +148,15 @@ void send_packet(){
   rten = rten+48;
   rone = rone+48;
 
-  //packet[4]=rtho;
-  //packet[5]=rhun;
-  //packet[6]=rten;
-  //packet[7]=rone;
+  //Values are put in to packet
   char packet[11] = {tho, hun, ten, one, rtho, rhun, rten, rone, button, '\n'};
-  /*
-  packet[0]=tho;
-  packet[1]=hun;
-  packet[2]=ten;
-  packet[3]=one;
-  packet[4]=rtho;
-  packet[5]='0';
-  packet[6]=rten;
-  packet[7]=rone;
-  packet[8]=button;
-  packet[9]='\n';
-  */
   delay(50);
-  Serial.print(packet);
-  //Serial.print(rightsensorint);
+  Serial.print(packet); //this call is what sends the packet
 }
 
 //===============
-
+//Checks for requests from monitor app, 
+//reads them in, then alters output devices
 void check_for_request(){
 
     static boolean recvInProgress = false;
@@ -173,10 +167,10 @@ void check_for_request(){
     int l=0;
     newData = false;
     
+   //read in the request
    while (Serial.available() > 0 && newData == false) {
         rc = Serial.read();
         l++;
-  //      if (recvInProgress == true) {
             if (rc != '\n') {
                 receivedChars[ndx] = rc;
                 ndx++;
@@ -190,13 +184,8 @@ void check_for_request(){
                 ndx = 0;
                 newData = true;
             }
-      //  }
-   //     else{
-     //       
-       //     recvInProgress = true;
-        //}
-        
     }
+    //turn on or of LED
     if(receivedChars[0]=='L'){
          if(receivedChars[1]=='0'){
            digitalWrite(ledPin, LOW);
@@ -205,6 +194,7 @@ void check_for_request(){
            digitalWrite(ledPin, HIGH);
          }
     }
+    //turn on or off vibration
     if(receivedChars[0]=='V'){
          if(receivedChars[1]=='1'){
            digitalWrite(vibrationpin,HIGH);
@@ -213,6 +203,7 @@ void check_for_request(){
           digitalWrite(vibrationpin,LOW);
          }
     }
+    //turn on or off sound, sound not currently implimented
     if(receivedChars[0]=='S'){
          if(receivedChars[1]=='0'){
            //Sound OFF
@@ -264,12 +255,9 @@ void reply_with_results(int results) {
         Serial.print(results);
         Serial.print('>');
         Serial.print('\n');
-            // change the state of the LED everytime a reply is sent to show that it got the message and then responded to the pc
+            // change the state of the LED everytime a reply is sent to show 
+            //that it got the message and then responded to the pc
         digitalWrite(ledPin, ! digitalRead(ledPin));
         newData = false;
     }
 }
-
-/*int responseTimer(){
-    return 100;
-}*/
