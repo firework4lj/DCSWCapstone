@@ -172,13 +172,6 @@ namespace DCSWMonitorApp
                     }
                 }
                 wheelHistory = temp;
-
-                // Print history to console for debugging
-              // for(int i = 0; i < historySize; i++)
-              // {
-              //     Console.Write(wheelHistory[i]+",");
-              // }
-              // Console.Write("\n");
             }
             else
             {
@@ -192,15 +185,13 @@ namespace DCSWMonitorApp
             //Write the serial port data to the console.
            string message = sp.ReadLine();
 
-           // Print message to console for debugging:
-           // Console.WriteLine(message);
-
            //message is the 9 character string sent from the arduino. The first 4 chars are for the left sensor, the next 4 are for the right sensor, and the last char is for the button
            ArduinoSerialMsg = string.Format("Left Sensor = {0}{1}{2}{3} | Right Sensor = {4}{5}{6}{7} | Button Status = {8}", message[0], message[1], message[2], message[3], message[4], message[5], message[6], message[7], message[8]);
 
            //Use this information to store left and right sensor value
            int leftSensor = int.Parse(string.Format("{0}{1}{2}{3}", message[0], message[1], message[2], message[3]));
            int rightSensor = int.Parse(string.Format("{0}{1}{2}{3}", message[4], message[5], message[6], message[7]));
+            // take the last <sensorHistorySize> readings from the sensor, and store them into an array. This is used later for averaging and "blip detection"
             int[] temp = new int[sensorHistorySize];
             for (int i = 0; i < sensorHistorySize; i++)
             {
@@ -214,6 +205,8 @@ namespace DCSWMonitorApp
                 }
             }
             sensorHistory = temp;
+
+            // Update the average for all sensor readings inside of sensorHistory array. Store the last average in spot 1 of the sensorAvgHistory array.
 
             double averageVal = 0;
             for (int i = 0; i < sensorHistorySize; i++)
@@ -239,18 +232,21 @@ namespace DCSWMonitorApp
                 }
             }
             sensorAvgHistory = temp2;
+            // Output for what is in the sensorAvgHistory array. Useful for debugging. Commenting out for now.
+            /*
             for(int i = 0; i < sensorAvgHistorySize; i++)
             {
                 Console.Write(sensorAvgHistory[i]+",");
             }
             Console.Write("\n");
+            */
 
             // First if statement should check if pvt is required at this point. 
             if (testInProgress == true || checkPvtRequired()) // Check if the test is required by time. Bypass if the test has already been started.
             {
                 if (testInProgress == true || checkPvtSafe()) // Check wheel history to determine if it is safe to perform a pvt test. Bypass if the test has already been started
                 {
-                    if (testInProgress == false)
+                    if (testInProgress == false) // If test has not started, start the test and grab start time, as all pre-conditions are met up to this point.
                     {
                         sp.Write("<s>\n");
                         sp.Write("V1\n");
@@ -258,9 +254,9 @@ namespace DCSWMonitorApp
                         startTime = DateTime.Now;
                         testInProgress = true;
                     }
-                    else if (testInProgress == true)
+                    else if (testInProgress == true) // Test is in progress, check for a blip using the pressure sensors, or a button press with the attached button.
                     {
-                        if ((message[8] == '0') || sensorBlipDetector()) // If button is pressed, or pressure sensors exceed 650, stop test. Pressure sensors ***NEED TO BE DYNAMICALLY SET***
+                        if ((message[8] == '0') || sensorBlipDetector()) // If button is pressed, or pressure sensor blip detector detects a blip, stop the test and output a result.
                         {
                             endTime = DateTime.Now;
                             testInProgress = false;
@@ -285,6 +281,9 @@ namespace DCSWMonitorApp
             }
         }
 
+        /* Check if PVT test is Required
+         * If elapsedTimeSpanFromLastPvt >= the test interval (secondsBetweenTests), return true. Also print to the console a test is required based on time elapsed.
+         */
         bool checkPvtRequired()
         {
             long elapsedTicksFromLastPvt = DateTime.Now.Ticks - pvtLastRan.Ticks;
@@ -302,6 +301,11 @@ namespace DCSWMonitorApp
                 return false;
             }
         }
+
+        /* Check if PVT test is safe to perform.
+         * This function checks to see if the steering wheel angles in wheelHistory are all within the maximum left and right turn degrees, specified at the top of the program
+         * If they are, return true. If false, print to console that the test is unsafe to perform currently, and return false.
+         */
 
         bool checkPvtSafe()
         {
@@ -322,6 +326,14 @@ namespace DCSWMonitorApp
             // Wheel has been within parameters for a PVT test to be performed.
             return true;
         }
+
+        /* Ah yes. The blip detector. Some of my finest code.
+         * This code looks at the two averages stored in sensorAvgHistory, and divides the most recent reading with the previous reading. 
+         * If the number exceeds the lowerBoundSensorAlg var specified at the top, a blip is detected and the function returns true.
+         * 
+         * Basically we take constant readings from the steering wheel pressure sensors, and average those readings out over a span of time. When it determines a sharp
+         * increase in pressure, the difference between the averages increases in size, up to a point where we can safely assume the user gripped the wheel harder and reacted to our stimulous.
+         */
 
         bool sensorBlipDetector()
         {
@@ -410,6 +422,8 @@ namespace DCSWMonitorApp
                 OnPropertyChanged();
             }
         }
+
+        // Output the time to next test to our window.
 
         public string TimeToNextTest
         {
