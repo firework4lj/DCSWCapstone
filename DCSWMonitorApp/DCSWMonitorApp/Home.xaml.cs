@@ -42,7 +42,7 @@ namespace DCSWMonitorApp
         public static int historySize = 16; // 16 measurements are stored of the steering wheel degrees for logic to be ran on.
         public static int sensorHistorySize = 16; // 16 measurements are stored of the pressure sensor in order to determine when the user grips it harder. 
         public static int sensorAvgHistorySize = 2; // 2 sensor average stores to compare new averages to in order to determine when a blip is detected. (it will only compare 2 averages at the current state.)
-        public static int secondsBetweenTests = 10; // 600 seconds, or 10 minutes between tests. Set to 30 seconds for testing
+        public static int secondsBetweenTests = 60; // 600 seconds, or 10 minutes between tests. Set to 30 seconds for testing
         public static int leftTurnMaxDegree = -400; // How far from center should the driver be able to turn left before the test is executed - MAX is -5000
         public static int rightTurnMaxDegree = 400; // How far from center should the driver be able to turn right before the test is executed - MAX is 5000
         public static double lowerBoundSensorAlg = 1.005; // Sensor average divided by previous average must result in a value greater than 1.2 indicating a blip has occured.
