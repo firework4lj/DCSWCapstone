@@ -57,10 +57,12 @@ namespace DCSWMonitorApp
                 DataContext = this;
                 Loaded += MainWindow_Loaded;
                 InitializeComponent();
+
                 //Set up time to be used for timing user responses
                 _timer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(100) };
                 _timer.Tick += _timer_Tick;
                 _timer.Start();
+
             // Initialize history array to all 0's
             for(int i = 0; i< historySize; i++)
             {
@@ -140,6 +142,7 @@ namespace DCSWMonitorApp
             var devices = directInput.GetDevices(deviceType, DeviceEnumerationFlags.AttachedOnly);
             return devices.Count > 0 ? devices[0] : null;
         }
+
         //used to make sure wheel position data constantly updated
         void _timer_Tick(object sender, EventArgs e)
             {
@@ -154,6 +157,7 @@ namespace DCSWMonitorApp
                 var state = joystick.GetCurrentState();
                 int xVal = state.X;
                 LeftAxis = string.Format("Wheel Position: {0} Degrees", xVal);
+
                 // Insert new reading into degree history, push list back.
                 int [] temp = new int[historySize];
                 for (int i = 0; i < historySize-1; i++)
@@ -168,6 +172,7 @@ namespace DCSWMonitorApp
                     }
                 }
                 wheelHistory = temp;
+
                 // Print history to console for debugging
               // for(int i = 0; i < historySize; i++)
               // {
@@ -180,15 +185,20 @@ namespace DCSWMonitorApp
                 LeftAxis = string.Format("Wheel Position: NOT CONNECTED");
             }
         }
+
         //getting data input for arduino for all connections with hardware other than steering wheel 
         private void sp_DataReceived(object sender, SerialDataReceivedEventArgs e)
         {
             //Write the serial port data to the console.
            string message = sp.ReadLine();
-           // No need for this debug message anymore.
+
+           // Print message to console for debugging:
            // Console.WriteLine(message);
-           //message it the 9 character string sent from the arduino. The first 4 chars are for the left sensor, the next 4 are for the right sensor, and the last is for the button
+
+           //message is the 9 character string sent from the arduino. The first 4 chars are for the left sensor, the next 4 are for the right sensor, and the last char is for the button
            ArduinoSerialMsg = string.Format("Left Sensor = {0}{1}{2}{3} | Right Sensor = {4}{5}{6}{7} | Button Status = {8}", message[0], message[1], message[2], message[3], message[4], message[5], message[6], message[7], message[8]);
+
+           //Use this information to store left and right sensor value
            int leftSensor = int.Parse(string.Format("{0}{1}{2}{3}", message[0], message[1], message[2], message[3]));
            int rightSensor = int.Parse(string.Format("{0}{1}{2}{3}", message[4], message[5], message[6], message[7]));
             int[] temp = new int[sensorHistorySize];
@@ -282,8 +292,8 @@ namespace DCSWMonitorApp
             TimeToNextTest = string.Format("Time to Next Test: {0} Seconds", Math.Truncate(secondsBetweenTests - elapsedTimeSpanFromLastPvt.TotalSeconds));
             if(elapsedTimeSpanFromLastPvt.TotalSeconds >= secondsBetweenTests)
             {
-                // Test is required now.
-                // It has been 10 minutes since last pvt test. 
+
+                // It has been 10 minutes since last pvt test. Test is required now.
                 Console.WriteLine("Test is now required based on time elapsed.");
                 return true;
             }
